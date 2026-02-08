@@ -1,0 +1,276 @@
+local bypass_framework = {}
+
+do
+    if not LPH_OBFUSCATED then
+        LPH_JIT = function(...)
+            return ...;
+        end;
+        LPH_JIT_MAX = function(...)
+            return ...;
+        end;
+        LPH_NO_VIRTUALIZE = function(...)
+            return ...;
+        end;
+        LPH_NO_UPVALUES = function(f)
+            return (function(...)
+                return f(...);
+            end);
+        end;
+        LPH_ENCSTR = function(...)
+            return ...;
+        end;
+        LPH_ENCNUM = function(...)
+            return ...;
+        end;
+        LPH_ENCFUNC = function(func, key1, key2)
+            if key1 ~= key2 then return print("LPH_ENCFUNC mismatch") end
+            return func
+        end
+        LPH_CRASH = function()
+            return print(debug.traceback());
+        end;
+
+        SWG_DiscordUser = "swim"
+        SWG_DiscordID = 1337
+        SWG_SecondsLeft = 9999
+        SWG_Note = "private"
+        SWG_IsLifetime = true
+    end
+
+    if not debug.isvalidlevel then
+        setreadonly(debug, false)
+        debug.isvalidlevel = LPH_NO_VIRTUALIZE(function(s)
+            local success = pcall(function()
+                return debug.getinfo(s + 3)
+            end)
+            return success
+        end)
+        setreadonly(debug, true)
+    end
+
+	getgenv().newlclosure = newlclosure or LPH_NO_VIRTUALIZE(function(f)
+		return function(...)
+			return f(...)
+		end
+	end)
+
+    bypass_framework.funcs = {}
+    bypass_framework.add_func = function(f)end
+
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Module = require(ReplicatedStorage:WaitForChild("EmberSharedLibrary"):WaitForChild("EmberShared"):WaitForChild("Datastructures"):WaitForChild("Encryption"):WaitForChild("AES"))
+
+	if not isfunctionhooked(Module.util.padByteString) then
+		local got_gc_env
+
+		for i, v in getgc(true) do
+			if type(v) == "table" then
+				if rawget(v, "newcclosure") and rawget(v, "vx") and type(getrawmetatable(v).__index) == "table" then
+					got_gc_env = v
+				end
+			end
+		end
+
+		if not got_gc_env then
+			while true do end
+		end
+
+		local values = {
+			sp = got_gc_env.sp,
+			v = got_gc_env.v,
+			vx = got_gc_env.vx,
+			logs = got_gc_env.logs,
+			tl = got_gc_env.tl,
+			cst = got_gc_env.cst,
+			--cst = got_gc_env.cst
+		}
+
+		local switchswitch = false
+
+		local old_fenv;
+
+        local bypass_funcs = bypass_framework.funcs
+
+        bypass_framework.add_func = function(f)
+            if not old_fenv then repeat task.wait() until old_fenv end
+            bypass_funcs[f] = old_fenv(f)
+        end
+
+        old_fenv = hookfunction(getrenv().getfenv, newcclosure(function(f_l)
+			if debug.traceback():find("ServiceManager") then
+
+				if type(f_l) == "function" --[[and f_l == old_func]] then
+					local bypass_fenv = bypass_funcs[f_l]
+                    if bypass_fenv then
+                        print("fucking dumbass", debug.info(f_l, "sn"))
+                    end
+					return bypass_fenv or old_fenv(f_l)
+				end
+
+				if f_l == nil then
+					local fenv = old_fenv(
+						not f_l and 3 or
+						type(f_l) == "number" and f_l + 2
+						or f_l
+					)
+					if not switchswitch then
+						switchswitch = true
+						table.foreach(fenv, print)
+					end
+					--[[print("------FENV START-------")
+					table.foreach(fenv, print)
+					print("-------FENV END--------")]]
+					local vals = tostring(fenv.s):split("\n")
+					if #vals > 2 then
+						table.foreach(fenv, print)
+						fenv.s = vals[#vals]
+					end
+
+					for i, v in values do
+						if fenv[i] ~= v then
+							print("gng", i, fenv[i], v)
+						end
+						fenv[i] = v
+					end
+					
+					return fenv
+				end
+                
+			end
+			return old_fenv(
+				not f_l and 3 or
+				type(f_l) == "number" and f_l + 2
+				or f_l
+			)
+		end))
+        
+        bypass_framework.add_func(Module.util.padByteString)
+
+		local old; old = hookfunction(Module.util.padByteString, newlclosure(function(val, ...)
+			local vals = tostring(val):split("\n")
+			--print("PASSED VALUE", os.time())
+			--print(val)
+			if #vals > 2 then
+				local spoofed = vals[#vals]
+				return old("\n"..spoofed, ...)
+			end
+			return old(val, ...)
+		end))
+		print("6ï¸âƒ£7ï¸âƒ£")
+	end
+end
+
+
+local workspace = cloneref(game:GetService("Workspace"))
+local Players = cloneref(game:GetService("Players"))
+local RunService = cloneref(game:GetService("RunService"))
+local Lighting = cloneref(game:GetService("Lighting"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
+local HttpService = cloneref(game:GetService("HttpService"))
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- priv9 main
+
+local aftermath = {
+    tickshift = 0,
+    remotes = {
+        gunmelee = game:GetService("ReplicatedStorage").GunSystem.Event.GunEvent.GunMelee,
+        gunfire = game:GetService("ReplicatedStorage").GunSystem.Event.GunEvent.GunFire,
+        bullethole = game:GetService("ReplicatedStorage").GunSystem.Event.GunEvent.BulletHole
+    },
+    gundata = game:GetService("ReplicatedStorage").GunSystemAssets.GunData,
+    sv_config = game:GetService("ReplicatedStorage").CustomCharacterConfigs.Configuration.Server
+}
+
+do
+    for _, gc in getgc(true) do
+        if type(gc) == "table" then
+            local gpfwc = rawget(gc, "GetPlayerFromWorldCharacter")
+
+            if (gpfwc and type(gpfwc) == "function") then
+                local list = getupvalues(gpfwc)[1]
+                if not (list and type(list) == "table") then continue end
+                aftermath.entitylist = list
+                continue
+            end
+
+            local CIDMap = rawget(gc, "CIDMap")
+
+            if (CIDMap and type(CIDMap) == "table") then
+		    	aftermath.cidmap = CIDMap
+                continue
+		    end
+
+			local route = rawget(gc, "Route")
+			local routeid = rawget(gc, "RouteId")
+			if route then
+				if route == "gun_fire" then
+					aftermath.gun_fire_route = gc
+				end
+				if route == "bullet_hole" then
+					aftermath.bullet_hole_route = gc
+				end
+			end
+		end
+    end
+end
+
+local newlclosure = newlclosure or LPH_NO_VIRTUALIZE(function(f)
+	return function(...)
+		return f(...)
+	end
+end)
+
+
+if not isfunctionhooked(aftermath.gun_fire_route.FireServer) then
+    -- !! IMPORTANT !!    
+    bypass_framework.add_func(aftermath.gun_fire_route.FireServer)
+
+	local old_fire; old_fire = hookfunction(aftermath.gun_fire_route.FireServer, newlclosure(function(...)
+		local route, data = ...
+	    print(route.Route)
+	    table.foreach(data, print)
+        return old_fire(...)
+	end))
+end
+
+
+local function nukeFoliage(obj)
+    -- Parts / MeshParts
+    if obj:IsA("BasePart") then
+        obj.Transparency = 1
+        obj.CanCollide = false
+        obj.CanTouch = false
+        obj.CanQuery = false
+    end
+
+    -- SpecialMesh
+    if obj:IsA("SpecialMesh") then
+        obj.MeshId = ""
+        obj.TextureId = ""
+    end
+
+    -- MeshPart 
+    if obj:IsA("MeshPart") then
+        obj.TextureID = ""
+    end
+
+    -- Textures / Decals
+    if obj:IsA("Texture") or obj:IsA("Decal") then
+        obj.Transparency = 1
+    end
+end
+
+
+for _, obj in ipairs(workspace:GetDescendants()) do
+    local name = string.lower(obj.Name)
+
+    if name:find("leaf")
+    or name:find("leaves")
+    or name:find("foliage")
+    or name:find("foliagi") then
+        nukeFoliage(obj)
+    end
+end
